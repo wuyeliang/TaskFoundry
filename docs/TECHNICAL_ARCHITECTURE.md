@@ -39,13 +39,12 @@ flowchart LR
 ## 3. 目录角色
 
 ```text
-llm_distill_law/
-  configs/      # LLaMA-Factory YAML 训练配置
-  data/         # 数据集映射与训练中间文件
-  docs/         # 文档
-  scripts/      # 下载、转换、蒸馏、评测脚本
-  modelscope/   # 本地模型和数据集缓存
-  outputs/      # LoRA 输出目录
+configs/      # LLaMA-Factory YAML 训练配置
+data/         # 数据集映射与训练中间文件
+docs/         # 文档
+scripts/      # 下载、转换、蒸馏、评测脚本
+modelscope/   # 本地模型和数据集缓存
+outputs/      # LoRA 输出目录
 ```
 
 `modelscope/` 是离线训练的关键资产目录。训练配置中的模型路径均指向
