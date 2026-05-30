@@ -1,0 +1,68 @@
+### model
+# student 基座模型路径。该模型会学习 teacher 生成的领域回答风格和知识。
+model_name_or_path: /workspace/modelscope/models/Qwen__Qwen3-1.7B
+trust_remote_code: true
+# 当前模板默认启用 FlashAttention-2。
+flash_attn: fa2
+
+### method
+# 第二阶段仍然是 SFT，但监督标签来自 4B teacher 的 response-based 蒸馏输出。
+stage: sft
+do_train: true
+# 继续使用 LoRA，最终部署时加载 1.7B base + student adapter 即可。
+finetuning_type: lora
+lora_rank: 16
+lora_alpha: 32
+lora_dropout: 0.05
+lora_target: all
+
+### dataset
+dataset_dir: /workspace/data
+# 该数据由 scripts/generate_teacher_responses.py 生成，字段仍是 Alpaca 格式。
+dataset: domain_teacher_aligned
+template: qwen3_nothink
+cutoff_len: 2048
+preprocessing_num_workers: 8
+dataloader_num_workers: 4
+overwrite_cache: true
+
+### output
+# student LoRA 输出目录；run_chat.sh 默认会加载这里的 adapter。
+output_dir: /workspace/outputs/student-distill-lora
+logging_steps: 10
+save_steps: 500
+plot_loss: true
+overwrite_output_dir: true
+# 保留完整 checkpoint，方便蒸馏阶段长时间运行时断点恢复。
+save_only_model: false
+report_to: none
+
+### train
+# 当前默认值更适合高显存单卡。
+# 如果换成显存更紧张的环境，student 阶段也建议从更保守的配置开始：
+#   per_device_train_batch_size: 1
+#   gradient_accumulation_steps: 16
+#   gradient_checkpointing: true
+#   per_device_eval_batch_size: 1
+# 如需提速，再逐步尝试 2x8，但不要直接跳到当前模板的 8x4。
+per_device_train_batch_size: 8
+# 有效 batch = 8 * 4 = 32。
+gradient_accumulation_steps: 4
+# student 蒸馏通常可略高于 teacher 学习率，以更快吸收 teacher response。
+learning_rate: 1.5e-4
+# student 使用 3 个 epoch，让小模型更充分拟合目标领域回答分布。
+num_train_epochs: 3.0
+lr_scheduler_type: cosine
+warmup_ratio: 0.05
+fp16: true
+bf16: false
+# student 阶段默认开启 gradient checkpointing，以降低显存压力。
+gradient_checkpointing: true
+ddp_timeout: 180000000
+
+### eval
+val_size: 0.02
+# 低显存环境建议把评估 batch 回退到 1。
+per_device_eval_batch_size: 8
+eval_strategy: steps
+eval_steps: 500

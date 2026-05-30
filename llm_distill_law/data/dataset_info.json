@@ -1,0 +1,8 @@
+{
+  "domain_train_alpaca": {
+    "file_name": "domain_train_alpaca.json"
+  },
+  "domain_teacher_aligned": {
+    "file_name": "domain_teacher_aligned.json"
+  }
+}

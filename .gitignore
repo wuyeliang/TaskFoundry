@@ -1,0 +1,9 @@
+.DS_Store
+llm_distill_law_副本/
+llm_distill_law/modelscope/
+llm_distill_law/outputs/
+llm_distill_law/logs/
+llm_distill_law/eval_outputs/
+llm_distill_law/data/*.remote.json
+llm_distill_law/configs/*.remote.yaml
+llm_distill_law/docs/*.remote.md

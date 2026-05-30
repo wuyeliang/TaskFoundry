@@ -1,0 +1,85 @@
+### model
+# teacher 基座模型路径。run_all.sh 会把宿主机项目目录挂载到容器 /workspace，
+# 因此这里使用容器内路径。
+model_name_or_path: /workspace/modelscope/models/Qwen__Qwen3-4B-Instruct-2507
+# Qwen 系列模型需要加载远程自定义代码/配置，离线时这些文件已随模型一起下载。
+trust_remote_code: true
+# 当前模板默认启用 FlashAttention-2。
+flash_attn: fa2
+
+### method
+# SFT 表示监督微调；第一阶段直接用领域 Alpaca 数据训练 4B teacher。
+stage: sft
+do_train: true
+# LoRA 只训练低秩增量矩阵，不更新全部基座权重，显存和磁盘开销更小。
+finetuning_type: lora
+# rank 越高表达能力越强，显存/训练时间也越高；16 是质量和成本的折中值。
+lora_rank: 16
+# alpha 控制 LoRA 增量缩放，通常设置为 rank 的 2 倍。
+lora_alpha: 32
+# 小 dropout 可缓解过拟合，0.05 是较稳妥的通用值。
+lora_dropout: 0.05
+# all 表示对所有线性层注入 LoRA，效果通常优于只训 q/v projection。
+lora_target: all
+
+### dataset
+# dataset_dir 指向 LLaMA-Factory 的 dataset_info.json 所在目录。
+dataset_dir: /workspace/data
+# 名称必须与 data/dataset_info.json 中的 key 一致。
+dataset: domain_train_alpaca
+# qwen3_nothink 关闭 Qwen3 thinking 模式，训练/推理格式保持一致。
+template: qwen3_nothink
+# 最大上下文长度。越大越吃显存；2048 对大多数问答型 SFT 比较稳妥。
+cutoff_len: 2048
+# 数据预处理并行度，主要影响 tokenization/cache 构建速度。
+preprocessing_num_workers: 8
+# DataLoader worker 数。当前模板默认使用 4。
+dataloader_num_workers: 4
+# 每次重跑都重新构建缓存，避免换数据后误用旧 cache。
+overwrite_cache: true
+
+### output
+# 4B teacher LoRA 输出目录，后续 teacher 生成蒸馏答案会加载这个 adapter。
+output_dir: /workspace/outputs/teacher-lora
+# 每 10 个 optimizer step 记录一次 loss/lr。
+logging_steps: 10
+# 每 500 step 保存一次 checkpoint，便于中断后 resume。
+save_steps: 500
+plot_loss: true
+overwrite_output_dir: true
+# false 表示保存 trainer state/optimizer/scheduler，支持断点续训。
+save_only_model: false
+report_to: none
+
+### train
+# 当前默认值更适合高显存单卡。
+# 如果换成显存更紧张的单卡，建议先回退到更保守的配置：
+#   per_device_train_batch_size: 1
+#   gradient_accumulation_steps: 16
+#   gradient_checkpointing: true
+#   per_device_eval_batch_size: 1
+# 先以“不 OOM”为第一目标，再逐步往上试。
+per_device_train_batch_size: 8
+# 有效 batch = 8 * 8 = 64；低显存环境不建议直接照搬 8x8。
+gradient_accumulation_steps: 8
+# LoRA SFT 常用 1e-4 到 2e-4；teacher 阶段取 1e-4 更稳。
+learning_rate: 1.0e-4
+# 训练 2 个 epoch，避免 teacher 在单一领域数据上过拟合过重。
+num_train_epochs: 2.0
+lr_scheduler_type: cosine
+warmup_ratio: 0.05
+# 默认使用 fp16，兼容大多数 CUDA 显卡。
+fp16: true
+bf16: false
+# 当前模板关闭 gradient checkpointing 以换取更高训练速度。
+# 如果换成低显存环境，应重新打开 gradient_checkpointing 来换显存空间。
+gradient_checkpointing: false
+ddp_timeout: 180000000
+
+### eval
+# 从训练集切 2% 做验证，便于观察 loss 是否异常。
+val_size: 0.02
+# 低显存环境建议把评估 batch 回退到 1。
+per_device_eval_batch_size: 8
+eval_strategy: steps
+eval_steps: 500
